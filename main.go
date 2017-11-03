@@ -219,7 +219,10 @@ func updateBattery(ctx context.Context, leaf *Leaf) {
 				close(ch)
 				continue
 			}
-		} else if err != nil {
+
+			key, err = leaf.sess.UpdateStatus()
+		}
+		if err != nil {
 			log.Printf("Error getting battery status: %v", err)
 			close(ch)
 			continue
@@ -282,7 +285,10 @@ func updateClimate(ctx context.Context, leaf *Leaf) {
 				close(ch)
 				continue
 			}
-		} else if err != nil {
+
+			cs, err = leaf.sess.ClimateControlStatus()
+		}
+		if err != nil {
 			log.Printf("Error getting climate control status: %v", err)
 			close(ch)
 			continue
