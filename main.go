@@ -213,7 +213,13 @@ func updateBattery(ctx context.Context, leaf *Leaf) {
 		log.Println("Updating battery information")
 
 		key, err := leaf.sess.UpdateStatus()
-		if err != nil {
+		if err == carwings.ErrNotLoggedIn {
+			if err := leaf.sess.Login(); err != nil {
+				log.Printf("Unable to log into carwings: %v", err)
+				close(ch)
+				continue
+			}
+		} else if err != nil {
 			log.Printf("Error getting battery status: %v", err)
 			close(ch)
 			continue
@@ -270,7 +276,13 @@ func updateClimate(ctx context.Context, leaf *Leaf) {
 		log.Println("Updating climate control information")
 
 		cs, err := leaf.sess.ClimateControlStatus()
-		if err != nil {
+		if err == carwings.ErrNotLoggedIn {
+			if err := leaf.sess.Login(); err != nil {
+				log.Printf("Unable to log into carwings: %v", err)
+				close(ch)
+				continue
+			}
+		} else if err != nil {
 			log.Printf("Error getting climate control status: %v", err)
 			close(ch)
 			continue
