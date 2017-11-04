@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
@@ -174,12 +175,24 @@ func main() {
 
 	// Update battery and climate status every 15m
 	go func() {
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+		battJitter := time.Duration(r.Intn(240)-120) * time.Second
+		hvacJitter := time.Duration(r.Intn(240)-120) * time.Second
+
+		battTicker := time.NewTicker(15*time.Minute + battJitter)
+		defer battTicker.Stop()
+
+		hvacTicker := time.NewTicker(15*time.Minute + hvacJitter)
+		defer hvacTicker.Stop()
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(15 * time.Minute):
+			case <-battTicker.C:
 				leaf.battUpdate <- make(chan struct{})
+			case <-hvacTicker.C:
 				leaf.hvacUpdate <- make(chan struct{})
 			}
 		}
