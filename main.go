@@ -17,6 +17,25 @@ import (
 	"github.com/joeshaw/carwings"
 )
 
+type ChargeService struct {
+	*service.Switch
+	BatteryLevel  *characteristic.BatteryLevel
+	ChargingState *characteristic.ChargingState
+}
+
+func newChargeService() *ChargeService {
+	svc := &ChargeService{
+		Switch:        service.NewSwitch(),
+		BatteryLevel:  characteristic.NewBatteryLevel(),
+		ChargingState: characteristic.NewChargingState(),
+	}
+
+	svc.AddCharacteristic(svc.BatteryLevel.Characteristic)
+	svc.AddCharacteristic(svc.ChargingState.Characteristic)
+
+	return svc
+}
+
 type Leaf struct {
 	sess *carwings.Session
 
@@ -25,8 +44,8 @@ type Leaf struct {
 
 	acc       *accessory.Accessory
 	battSvc   *service.BatteryService
-	hvacSvc   *service.FanV2
-	chargeSvc *service.Switch
+	hvacSvc   *service.Fan
+	chargeSvc *ChargeService
 }
 
 type Config struct {
@@ -60,7 +79,7 @@ func main() {
 	config := Config{
 		StoragePath:   filepath.Join(os.Getenv("HOME"), ".homecontrol"),
 		Region:        "NNA",
-		AccessoryName: "Leaf",
+		AccessoryName: "Car",
 		HomekitPIN:    "00102003",
 	}
 
@@ -98,9 +117,21 @@ func main() {
 		hvacUpdate: make(chan chan struct{}),
 		acc:        accessory.New(info, accessory.TypeOther),
 		battSvc:    service.NewBatteryService(),
-		chargeSvc:  service.NewSwitch(),
-		hvacSvc:    service.NewFanV2(),
+		chargeSvc:  newChargeService(),
+		hvacSvc:    service.NewFan(),
 	}
+
+	n := characteristic.NewName()
+	n.SetValue("Battery")
+	leaf.battSvc.AddCharacteristic(n.Characteristic)
+
+	n = characteristic.NewName()
+	n.SetValue("Charging")
+	leaf.chargeSvc.AddCharacteristic(n.Characteristic)
+
+	n = characteristic.NewName()
+	n.SetValue("Climate Control")
+	leaf.hvacSvc.AddCharacteristic(n.Characteristic)
 
 	leaf.acc.AddService(leaf.battSvc.Service)
 	leaf.acc.AddService(leaf.hvacSvc.Service)
@@ -123,22 +154,8 @@ func main() {
 		leaf.battUpdate <- make(chan struct{})
 	})
 
-	leaf.hvacSvc.Active.OnValueRemoteUpdate(func(active int) {
-		switch active {
-		case characteristic.ActiveInactive:
-			log.Println("Sending request to turn off climate control")
-			key, err := leaf.sess.ClimateOffRequest()
-			if err != nil {
-				log.Printf("Error requesting climate off: %v", err)
-				return
-			}
-
-			if err := waitOnKey(ctx, key, leaf.sess.CheckClimateOffRequest); err != nil {
-				log.Printf("Error requesting climate off (%s): %v", key, err)
-				return
-			}
-
-		case characteristic.ActiveActive:
+	leaf.hvacSvc.On.OnValueRemoteUpdate(func(on bool) {
+		if on {
 			log.Println("Sending request to turn on climate control")
 			key, err := leaf.sess.ClimateOnRequest()
 			if err != nil {
@@ -148,6 +165,18 @@ func main() {
 
 			if err := waitOnKey(ctx, key, leaf.sess.CheckClimateOnRequest); err != nil {
 				log.Printf("Error requesting climate on (%s): %v", key, err)
+				return
+			}
+		} else {
+			log.Println("Sending request to turn off climate control")
+			key, err := leaf.sess.ClimateOffRequest()
+			if err != nil {
+				log.Printf("Error requesting climate off: %v", err)
+				return
+			}
+
+			if err := waitOnKey(ctx, key, leaf.sess.CheckClimateOffRequest); err != nil {
+				log.Printf("Error requesting climate off (%s): %v", key, err)
 				return
 			}
 		}
@@ -255,6 +284,7 @@ func updateBattery(ctx context.Context, leaf *Leaf) {
 		}
 
 		leaf.battSvc.BatteryLevel.SetValue(bs.StateOfCharge)
+		leaf.chargeSvc.BatteryLevel.SetValue(bs.StateOfCharge)
 
 		// Ideally we'd only set this if the Leaf's low
 		// battery warning was set, but the Carwings API
@@ -270,6 +300,7 @@ func updateBattery(ctx context.Context, leaf *Leaf) {
 			status = characteristic.ChargingStateCharging
 		}
 		leaf.battSvc.ChargingState.SetValue(status)
+		leaf.chargeSvc.ChargingState.SetValue(status)
 		leaf.chargeSvc.On.SetValue(status == characteristic.ChargingStateCharging)
 
 		log.Printf("Battery info update complete: %d%%, %s", bs.StateOfCharge, bs.ChargingStatus)
@@ -307,12 +338,7 @@ func updateClimate(ctx context.Context, leaf *Leaf) {
 			continue
 		}
 
-		active := characteristic.ActiveInactive
-		if cs.Running {
-			active = characteristic.ActiveActive
-		}
-
-		leaf.hvacSvc.Active.SetValue(active)
+		leaf.hvacSvc.On.SetValue(cs.Running)
 
 		log.Printf("Climate control info update complete: running %t", cs.Running)
 		close(ch)
