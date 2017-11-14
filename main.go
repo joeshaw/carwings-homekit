@@ -144,45 +144,51 @@ func main() {
 			return
 		}
 
-		log.Println("Sending charging request")
-		if err := leaf.sess.ChargingRequest(); err != nil {
-			log.Printf("Error requesting charging: %v", err)
-			return
-		}
+		// Contacting Carwings takes too long; run this in a goroutine
+		go func() {
+			log.Println("Sending charging request")
+			if err := leaf.sess.ChargingRequest(); err != nil {
+				log.Printf("Error requesting charging: %v", err)
+				return
+			}
 
-		// Request a battery status update
-		leaf.battUpdate <- make(chan struct{})
+			// Request a battery status update
+			leaf.battUpdate <- make(chan struct{})
+		}()
 	})
 
 	leaf.hvacSvc.On.OnValueRemoteUpdate(func(on bool) {
-		if on {
-			log.Println("Sending request to turn on climate control")
-			key, err := leaf.sess.ClimateOnRequest()
-			if err != nil {
-				log.Printf("Error requesting climate on: %v", err)
-				return
+		// Contacting Carwings takes too long; run this in a goroutine
+		go func() {
+			if on {
+				log.Println("Sending request to turn on climate control")
+				key, err := leaf.sess.ClimateOnRequest()
+				if err != nil {
+					log.Printf("Error requesting climate on: %v", err)
+					return
+				}
+
+				if err := waitOnKey(ctx, key, leaf.sess.CheckClimateOnRequest); err != nil {
+					log.Printf("Error requesting climate on (%s): %v", key, err)
+					return
+				}
+			} else {
+				log.Println("Sending request to turn off climate control")
+				key, err := leaf.sess.ClimateOffRequest()
+				if err != nil {
+					log.Printf("Error requesting climate off: %v", err)
+					return
+				}
+
+				if err := waitOnKey(ctx, key, leaf.sess.CheckClimateOffRequest); err != nil {
+					log.Printf("Error requesting climate off (%s): %v", key, err)
+					return
+				}
 			}
 
-			if err := waitOnKey(ctx, key, leaf.sess.CheckClimateOnRequest); err != nil {
-				log.Printf("Error requesting climate on (%s): %v", key, err)
-				return
-			}
-		} else {
-			log.Println("Sending request to turn off climate control")
-			key, err := leaf.sess.ClimateOffRequest()
-			if err != nil {
-				log.Printf("Error requesting climate off: %v", err)
-				return
-			}
-
-			if err := waitOnKey(ctx, key, leaf.sess.CheckClimateOffRequest); err != nil {
-				log.Printf("Error requesting climate off (%s): %v", key, err)
-				return
-			}
-		}
-
-		// Request a climate status update
-		leaf.hvacUpdate <- make(chan struct{})
+			// Request a climate status update
+			leaf.hvacUpdate <- make(chan struct{})
+		}()
 	})
 
 	hcConfig := hc.Config{
