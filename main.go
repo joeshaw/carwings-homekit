@@ -280,27 +280,34 @@ func updateBattery(ctx context.Context, leaf *Leaf) {
 			continue
 		}
 
-		leaf.battSvc.BatteryLevel.SetValue(bs.StateOfCharge)
-		leaf.chargeSvc.BatteryLevel.SetValue(bs.StateOfCharge)
+		switch bs.ChargingStatus {
+		case carwings.NotCharging, carwings.NormalCharging, carwings.RapidlyCharging:
+			leaf.battSvc.BatteryLevel.SetValue(bs.StateOfCharge)
+			leaf.chargeSvc.BatteryLevel.SetValue(bs.StateOfCharge)
 
-		// Ideally we'd only set this if the Leaf's low
-		// battery warning was set, but the Carwings API
-		// doesn't give that to us.  So let's just say 20%.
-		lowBatt := characteristic.StatusLowBatteryBatteryLevelNormal
-		if bs.StateOfCharge <= 20 {
-			lowBatt = characteristic.StatusLowBatteryBatteryLevelLow
+			// Ideally we'd only set this if the Leaf's low
+			// battery warning was set, but the Carwings API
+			// doesn't give that to us.  So let's just say 20%.
+			lowBatt := characteristic.StatusLowBatteryBatteryLevelNormal
+			if bs.StateOfCharge <= 20 {
+				lowBatt = characteristic.StatusLowBatteryBatteryLevelLow
+			}
+			leaf.battSvc.StatusLowBattery.SetValue(lowBatt)
+
+			status := characteristic.ChargingStateNotCharging
+			if bs.ChargingStatus == carwings.NormalCharging || bs.ChargingStatus == carwings.RapidlyCharging {
+				status = characteristic.ChargingStateCharging
+			}
+			leaf.battSvc.ChargingState.SetValue(status)
+			leaf.chargeSvc.ChargingState.SetValue(status)
+			leaf.chargeSvc.On.SetValue(status == characteristic.ChargingStateCharging)
+
+			log.Printf("Battery info update complete: %d%%, %s", bs.StateOfCharge, bs.ChargingStatus)
+
+		default:
+			log.Printf("Invalid battery info state: %d%%, %s", bs.StateOfCharge, bs.ChargingStatus)
 		}
-		leaf.battSvc.StatusLowBattery.SetValue(lowBatt)
 
-		status := characteristic.ChargingStateNotCharging
-		if bs.ChargingStatus == carwings.NormalCharging || bs.ChargingStatus == carwings.RapidlyCharging {
-			status = characteristic.ChargingStateCharging
-		}
-		leaf.battSvc.ChargingState.SetValue(status)
-		leaf.chargeSvc.ChargingState.SetValue(status)
-		leaf.chargeSvc.On.SetValue(status == characteristic.ChargingStateCharging)
-
-		log.Printf("Battery info update complete: %d%%, %s", bs.StateOfCharge, bs.ChargingStatus)
 		close(ch)
 	}
 }
