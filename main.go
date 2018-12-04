@@ -329,6 +329,10 @@ func updateClimate(ctx context.Context, leaf *Leaf) {
 		cs, err := leaf.sess.ClimateControlStatus()
 		if err != nil {
 			log.Printf("Error getting climate control status: %v", err)
+
+			// If we get an error, assume the climate control is off
+			leaf.hvacSvc.On.SetValue(false)
+
 			close(ch)
 			continue
 		}
