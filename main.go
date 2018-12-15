@@ -77,7 +77,7 @@ func main() {
 
 	// Default values
 	config := Config{
-		StoragePath:   filepath.Join(os.Getenv("HOME"), ".homecontrol"),
+		StoragePath:   filepath.Join(os.Getenv("HOME"), ".homecontrol", "carwings"),
 		Region:        "NNA",
 		AccessoryName: "Car",
 		HomekitPIN:    "00102003",
