@@ -97,9 +97,12 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	s := &carwings.Session{
+		Region: config.Region,
+	}
+
 	log.Println("Connecting to Carwings service")
-	s, err := carwings.Connect(config.Username, config.Password, config.Region)
-	if err != nil {
+	if err := s.Connect(config.Username, config.Password); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Connected to Carwings")
