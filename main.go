@@ -208,33 +208,14 @@ func main() {
 		<-t.Stop()
 	})
 
-	go updateBattery(ctx, leaf)
-	go updateClimate(ctx, leaf)
+	// Update battery and climate status every 15m +/- 2m
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	// Update battery and climate status every 15m
-	go func() {
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	jitter := time.Duration(r.Intn(240)-120) * time.Second
+	go updateBattery(ctx, leaf, 15*time.Minute+jitter)
 
-		battJitter := time.Duration(r.Intn(240)-120) * time.Second
-		hvacJitter := time.Duration(r.Intn(240)-120) * time.Second
-
-		battTicker := time.NewTicker(15*time.Minute + battJitter)
-		defer battTicker.Stop()
-
-		hvacTicker := time.NewTicker(15*time.Minute + hvacJitter)
-		defer hvacTicker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-battTicker.C:
-				leaf.battUpdate <- make(chan struct{})
-			case <-hvacTicker.C:
-				leaf.hvacUpdate <- make(chan struct{})
-			}
-		}
-	}()
+	jitter = time.Duration(r.Intn(240)-120) * time.Second
+	go updateClimate(ctx, leaf, 15*time.Minute+jitter)
 
 	// And update them initially, and wait for them to finish
 	// before exposing the accessory to HomeKit.
@@ -248,9 +229,12 @@ func main() {
 	t.Start()
 }
 
-func updateBattery(ctx context.Context, leaf *Leaf) {
-	log.Println("Entering battery update loop")
+func updateBattery(ctx context.Context, leaf *Leaf, interval time.Duration) {
+	log.Printf("Entering battery update loop, updating every %v", interval)
 	defer log.Println("Exited battery update loop")
+
+	t := time.NewTicker(interval)
+	defer t.Stop()
 
 	for {
 		var ch chan struct{}
@@ -258,6 +242,8 @@ func updateBattery(ctx context.Context, leaf *Leaf) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-t.C:
+			ch = make(chan struct{})
 		case ch = <-leaf.battUpdate:
 		}
 
@@ -315,15 +301,20 @@ func updateBattery(ctx context.Context, leaf *Leaf) {
 	}
 }
 
-func updateClimate(ctx context.Context, leaf *Leaf) {
-	log.Println("Entering climate control update loop")
+func updateClimate(ctx context.Context, leaf *Leaf, interval time.Duration) {
+	log.Printf("Entering climate control update loop, updating every %v", interval)
 	defer log.Println("Exited climate control update loop")
+
+	t := time.NewTicker(interval)
+	defer t.Stop()
 
 	for {
 		var ch chan struct{}
 		select {
 		case <-ctx.Done():
 			return
+		case <-t.C:
+			ch = make(chan struct{})
 		case ch = <-leaf.hvacUpdate:
 		}
 
