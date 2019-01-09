@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"log"
 	"math/rand"
@@ -358,19 +359,24 @@ func updateClimate(ctx context.Context, leaf *Leaf, interval time.Duration) {
 }
 
 func waitOnKey(ctx context.Context, key string, fn func(string) (bool, error)) error {
-	interval := 0 * time.Second
+	start := time.Now()
 	for {
+                if time.Since(start) > 2*time.Minute {
+			return errors.New("timed out waiting for update")
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(interval):
+		case <-time.After(5 * time.Second):
 		}
-		interval = 5 * time.Second
 
-		if done, err := fn(key); done {
-			return nil
-		} else if err != nil {
+		done, err := fn(key)
+		if err != nil {
 			return err
+		}
+		if done {
+			return nil
 		}
 	}
 }
