@@ -67,6 +67,19 @@ type Config struct {
 
 	// HomeKit PIN.  Defaults to 00102003.
 	HomekitPIN string `json:"homekit_pin"`
+
+	// Climate control update interval, in seconds.  Defaults to
+	// 900 (15m).  A jitter of up to 2 minutes is applied in
+	// either direction.
+	ClimateUpdateInterval int `json:"climate_update_interval"`
+
+	// Battery status update interval, in seconds.  Defaults to
+	// 900 (15m).  A jitter of up to 2 minutes is applied in
+	// either direction.
+	BatteryUpdateInterval int `json:"battery_update_interval"`
+
+	// Debug turns on Carwings debug output.
+	Debug bool `json:"debug"`
 }
 
 func main() {
@@ -77,10 +90,12 @@ func main() {
 
 	// Default values
 	config := Config{
-		StoragePath:   filepath.Join(os.Getenv("HOME"), ".homecontrol", "carwings"),
-		Region:        "NNA",
-		AccessoryName: "Car",
-		HomekitPIN:    "00102003",
+		StoragePath:           filepath.Join(os.Getenv("HOME"), ".homecontrol", "carwings"),
+		Region:                "NNA",
+		AccessoryName:         "Car",
+		HomekitPIN:            "00102003",
+		ClimateUpdateInterval: 900,
+		BatteryUpdateInterval: 900,
 	}
 
 	f, err := os.Open(configFile)
@@ -96,6 +111,8 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	carwings.Debug = config.Debug
 
 	s := &carwings.Session{
 		Region: config.Region,
@@ -208,14 +225,16 @@ func main() {
 		<-t.Stop()
 	})
 
-	// Update battery and climate status every 15m +/- 2m
+	// Update battery and climate status, with 2m jitter
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
+	interval := time.Duration(config.BatteryUpdateInterval) * time.Second
 	jitter := time.Duration(r.Intn(240)-120) * time.Second
-	go updateBattery(ctx, leaf, 15*time.Minute+jitter)
+	go updateBattery(ctx, leaf, interval+jitter)
 
+	interval = time.Duration(config.ClimateUpdateInterval) * time.Second
 	jitter = time.Duration(r.Intn(240)-120) * time.Second
-	go updateClimate(ctx, leaf, 15*time.Minute+jitter)
+	go updateClimate(ctx, leaf, interval+jitter)
 
 	// And update them initially, and wait for them to finish
 	// before exposing the accessory to HomeKit.
