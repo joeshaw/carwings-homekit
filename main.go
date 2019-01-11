@@ -361,7 +361,7 @@ func updateClimate(ctx context.Context, leaf *Leaf, interval time.Duration) {
 func waitOnKey(ctx context.Context, key string, fn func(string) (bool, error)) error {
 	start := time.Now()
 	for {
-                if time.Since(start) > 2*time.Minute {
+		if time.Since(start) > 3*time.Minute {
 			return errors.New("timed out waiting for update")
 		}
 
