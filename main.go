@@ -14,6 +14,7 @@ import (
 	"github.com/brutella/hc"
 	"github.com/brutella/hc/accessory"
 	"github.com/brutella/hc/characteristic"
+	hclog "github.com/brutella/hc/log"
 	"github.com/brutella/hc/service"
 	"github.com/joeshaw/carwings"
 )
@@ -114,6 +115,9 @@ func main() {
 	defer cancel()
 
 	carwings.Debug = config.Debug
+	if config.Debug {
+		hclog.Debug.Enable()
+	}
 
 	s := &carwings.Session{
 		Region: config.Region,
