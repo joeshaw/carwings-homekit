@@ -1,7 +1,7 @@
 # carwings-homecontrol
 
 HomeKit support for the Nissan Leaf using
-[HomeControl](https://github.com/brutella/hc) and my [Carwings Go
+[hc](https://github.com/brutella/hc) and my [Carwings Go
 library](https://github.com/joeshaw/carwings).
 
 When running, this service publishes a single HomeKit accessory
@@ -24,7 +24,7 @@ home hub like an Apple TV or iPad, you can control the Leaf remotely.
 
 The tool can be installed with:
 
-    go get -u github.com/joeshaw/carwings-homecontrol
+    go get -u github.com/joeshaw/carwings-homekit
 
 You will need to create a `config.json` file with your Carwings
 username and password, like so:
@@ -38,7 +38,7 @@ username and password, like so:
 
 Then you can run the service:
 
-    carwings-homecontrol -config config.json
+    carwings-homekit -config config.json
 
 The service will make an initial call to the Carwings service to get
 updated and current battery and climate control information, and then
@@ -60,7 +60,7 @@ sure the code has been run through `gofmt`.
 
 Copyright 2017 Joe Shaw
 
-`carwings-homecontrol` is licensed under the MIT License.  See the LICENSE file
+`carwings-homekit` is licensed under the MIT License.  See the LICENSE file
 for details.
 
 

@@ -1,4 +1,4 @@
-module github.com/joeshaw/carwings-homecontrol
+module github.com/joeshaw/carwings-homekit
 
 go 1.12
 
